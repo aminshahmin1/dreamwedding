@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wedding Invitation</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background-color: #fdf7f2;
+            overflow: hidden;
+        }
+
+        .canva-embed {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        #notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            background-color: #007bff;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 14px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            cursor: pointer;
+            visibility: hidden;
+            animation: fadeIn 1s forwards;
+            z-index: 10;
+        }
+
+        #notification.show {
+            visibility: visible;
+        }
+
+        #notification-bubble {
+            position: fixed;
+            bottom: 100px;
+            right: 20px;
+            background-color: white;
+            color: black;
+            padding: 10px 15px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            display: none;
+            z-index: 10;
+        }
+
+        #notification-bubble.show {
+            display: block;
+        }
+
+        .floating-comment {
+            position: absolute;
+            background-color: white;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            padding: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            animation: float-and-disappear 10s linear forwards;
+            max-width: 200px;
+            text-align: center;
+        }
+
+        @keyframes float-and-disappear {
+            0% { opacity: 1; }
+            80% { opacity: 1; transform: translateY(-20px); }
+            100% { opacity: 0; transform: translateY(-40px); }
+        }
+
+        #comment-popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            display: none;
+            text-align: center;
+        }
+
+        #comment-popup input {
+            width: 80%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+
+        #comment-popup button {
+            padding: 10px 20px;
+            border: none;
+            background-color: #007bff;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        #comment-popup button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <!-- Canva Embed -->
+    <iframe 
+        class="canva-embed" 
+        src="https://www.canva.com/design/DAFb6jjsvSQ/8U16HGsoQNr-XQrLZSmW3w/view?embed" 
+        allowfullscreen>
+    </iframe>
+
+    <!-- Notification -->
+    <div id="notification" onclick="openCommentPopup()">
+        🙌
+    </div>
+    <div id="notification-bubble">Jom tinggalkan pesanan gembira buat kedua mempelai ini!</div>
+
+    <!-- Comment Popup -->
+    <div id="comment-popup">
+        <h3 id="popup-title">Hantar pesanan gembira anda!</h3>
+        <input type="text" id="commentInput" placeholder="Tambahkan emoji dan pesan di sini... 😊" />
+        <button onclick="addComment()">Kirim</button>
+    </div>
+
+    <!-- Floating Comments Container -->
+    <div id="comments-container"></div>
+
+    <!-- Script for API Integration -->
+    <script>
+        const SHEET_ID = "1Q2bygxlYxQvRR0vWAUIC9dpU5vj9IaPiklDMb5hmSrA"; // Your Google Sheet ID
+        const API_KEY = "AIzaSyCzOG0MR3u85QAhVewBlsIQ6iz6r4cpaKo"; // Your API Key
+
+        const SHEET_URL = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/A:B:append?valueInputOption=RAW&key=${API_KEY}`;
+        const GET_COMMENTS_URL = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/A:B?key=${API_KEY}`;
+
+        // Fetch comments from Google Sheets
+        async function fetchComments() {
+            console.log("Fetching comments...");
+            try {
+                const response = await fetch(GET_COMMENTS_URL);
+                if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+                const data = await response.json();
+                console.log("Fetched Data:", data);
+
+                const rows = data.values || [];
+                rows.slice(1).forEach((row) => {
+                    displayComment(row[1]);
+                });
+            } catch (error) {
+                console.error("Error fetching comments:", error);
+            }
+        }
+
+        // Add a new comment to Google Sheets
+        async function addComment() {
+            const commentText = document.getElementById("commentInput").value;
+            if (commentText) {
+                console.log("Adding comment:", commentText);
+                const payload = {
+                    values: [[new Date().toISOString(), commentText]],
+                };
+                try {
+                    const response = await fetch(SHEET_URL, {
+                        method: "POST",
+                        body: JSON.stringify(payload),
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                    });
+                    if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+                    displayComment(commentText);
+                    document.getElementById("commentInput").value = "";
+                } catch (error) {
+                    console.error("Error adding comment:", error);
+                }
+            }
+        }
+
+        // Display comments as floating messages
+        function displayComment(commentText) {
+            const comment = document.createElement("div");
+            comment.className = "floating-comment";
+            comment.style.top = `${Math.random() * 80 + 10}%`; // Random Y-position
+            comment.style.left = `${Math.random() * 80 + 10}%`; // Random X-position
+            comment.textContent = commentText;
+
+            document.getElementById("comments-container").appendChild(comment);
+
+            setTimeout(() => comment.remove(), 10000); // Remove after 10 seconds
+        }
+
+        // Open the comment popup
+        function openCommentPopup() {
+            document.getElementById("comment-popup").style.display = "block";
+        }
+
+        // Fetch comments on page load
+        window.onload = fetchComments;
+    </script>
+</body>
+</html>
